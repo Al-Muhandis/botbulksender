@@ -158,7 +158,7 @@ begin
   if FWorker.BulkMessageID=0 then
   begin
     BulkSenderDB.AddTask(aUsers, aBulkMessageID, aMessage);
-    BotBulkRun(aBulkMessageID);
+    BotBulkEditMessage(aBulkMessageID);
   end;
 end;
 
