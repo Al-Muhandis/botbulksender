@@ -5,19 +5,17 @@ unit BotBulk;
 interface
 
 uses
-  Classes, SysUtils, tgtypes, tgsendertypes, brooktelegramaction, bulksend_db, tgsenderworker
+  Classes, SysUtils, tgtypes, tgsendertypes, brooktelegramaction, bulksend_db, tgsenderworker, tgplugin, tgbot
   ;
 
 type
 
   { TBotPlgnBulkSender }
 
-  TBotPlgnBulkSender = class
+  TBotPlgnBulkSender = class(TCustomTelegramBotPlugin)
   private
     FAllIsYearsAgo: Integer;
-    FBot: TWebhookBot;
     FBulkSenderDB: TBulkSenderDB;
-    FDirectory: String;
     FWorker: TBulkSenderThread;
     procedure AddTask(aUsers: TStrings; const aMessage: TTelegramMessageObj);
     procedure BotBulkEdit(const aDataLine: String);
@@ -59,18 +57,17 @@ type
     function GetBulkSenderDB: TBulkSenderDB;
     class function GetCommandAlias: String; static;
     function GetListFileName(const ListID: String): String;
-    procedure Register;
     procedure SaveList(AStrings: TStrings; out ListID: String);
     procedure SetWorker(AValue: TBulkSenderThread);
+    function TGBot: TWebhookBot;
   protected
     property BulkSenderDB: TBulkSenderDB read GetBulkSenderDB;
-    property Bot: TWebhookBot read FBot;
+    procedure Register; override;
   public
     function CheckReply(const aFirstLine: String; aMessage: TTelegramMessageObj): Boolean;
-    constructor Create(aOwner: TWebhookBot);
+    constructor Create(aOwner: TTelegramBot); override;
     destructor Destroy; override;
     property AllIsYearsAgo: Integer read FAllIsYearsAgo write FAllIsYearsAgo;
-    property Directory: String read FDirectory;
     class property CommandAlias: String read GetCommandAlias;      
     property Worker: TBulkSenderThread read FWorker write SetWorker;
   end;
@@ -418,7 +415,7 @@ begin
     aUpdated:=Now-2000;
   aIDs:=TStringList.Create;
   try
-    Bot.CalculateStat(aUpdated, Now, aUsers, aEvents, aIDs);
+    TGBot.CalculateStat(aUpdated, Now, aUsers, aEvents, aIDs);
     BulkSenderDB.AddUsersToList(aUserListID, aIDs);
   except
     aIDs.Free;
@@ -502,7 +499,7 @@ begin
   Msg:=EmptyStr;
   aIDs:=TStringList.Create;
   try
-    Bot.CalculateStat(aFromDate, aToDate, aUsers, aEvents, aIDs);
+    TGBot.CalculateStat(aFromDate, aToDate, aUsers, aEvents, aIDs);
     Msg+=LineEnding+'Users for bulk send: '+IntToStr(aUsers);
     SaveList(aIDs, aListID);
     ForceBulkSend(aListID);
@@ -579,8 +576,8 @@ end;
 
 procedure TBotPlgnBulkSender.Register;
 begin
-  Bot.CommandHandlers['/'+CommandAlias]:=@BotCommandBulkSend;
-  Bot.CallbackHandlers[CommandAlias]:=@BotCallbackBulkSend;
+  TGBot.CommandHandlers['/'+CommandAlias]:=@BotCommandBulkSend;
+  TGBot.CallbackHandlers[CommandAlias]:=@BotCallbackBulkSend;
 end;
 
 procedure TBotPlgnBulkSender.SaveList(AStrings: TStrings; out ListID: String);
@@ -606,7 +603,12 @@ procedure TBotPlgnBulkSender.SetWorker(AValue: TBulkSenderThread);
 begin
   if FWorker=AValue then Exit;
   FWorker:=AValue;
-  FDirectory:=AValue.Directory;
+  Directory:=AValue.Directory;
+end;
+
+function TBotPlgnBulkSender.TGBot: TWebhookBot;
+begin
+  Result:=Bot as TWebhookBot;
 end;
 
 procedure TBotPlgnBulkSender.BotBulkEdit(const aDataLine: String);
@@ -676,7 +678,7 @@ begin
       aMsg+=LineEnding+s_DisablePreview+': '+s_turnedOn;
     aMsg+=LineEnding+'Current active task: #'+Worker.BulkMessageID.ToString+
       LineEnding+LineEnding+'Message:'+LineEnding+BulkSenderDB.GetBulkMessageByID(aBulkMessageID).Text;
-    Bot.EditOrSendMessage(aMsg, pmMarkdown, aReplyMarkup, True);
+    TGBot.EditOrSendMessage(aMsg, pmMarkdown, aReplyMarkup, True);
   finally
    aReplyMarkup.Free;
   end;
@@ -692,7 +694,7 @@ begin
     BulkSenderDB.GetBulkMessageByID(aBulkMessageID);
     aTurnedOn:=BulkSenderDB.BulkMessage.HideButton;
     aReplyMarkup.InlineKeyBoard:=CreateInKbd4BulkTurn(dt_bulkmessage, dt_hide, aBulkMessageID);
-    Bot.EditOrSendMessage(emj_CheckBox+' '+s_HideButton+': *'+
+    TGBot.EditOrSendMessage(emj_CheckBox+' '+s_HideButton+': *'+
       BoolToStr(aTurnedOn, s_turnedOn, s_turnedOff)+'*'+LineEnding, pmMarkdown, aReplyMarkup, True);
   finally
     aReplyMarkup.Free;
@@ -714,7 +716,7 @@ begin
       'Set caption', data_SetBulk(dt_bulkmessage, aBulkMessageID, dt_urltext)]);
     aReplyMarkup.InlineKeyBoard.Add.AddButton(emj_Back+' '+s_Cancel, data_EditBulk(dt_bulkmessage,
       aBulkMessageID));
-    Bot.EditOrSendMessage(s_UrlButton+': *'+aUrl+'*'+LineEnding+s_UrlButtonText+': '+
+    TGBot.EditOrSendMessage(s_UrlButton+': *'+aUrl+'*'+LineEnding+s_UrlButtonText+': '+
       '*'+BulkSenderDB.BulkMessage.ButtonUrlText+'*', pmMarkdown,
       aReplyMarkup, True);
   finally
@@ -732,7 +734,7 @@ begin
     BulkSenderDB.GetBulkMessageByID(aBulkMessageID);
     aTurnedOn:=BulkSenderDB.BulkMessage.DisableWebPagePreview;
     aReplyMarkup.InlineKeyBoard:=CreateInKbd4BulkTurn(dt_bulkmessage, dt_disablepreview, aBulkMessageID);
-    Bot.EditOrSendMessage(emj_CheckBox+' '+s_DisablePreview+': *'+
+    TGBot.EditOrSendMessage(emj_CheckBox+' '+s_DisablePreview+': *'+
       BoolToStr(aTurnedOn, s_turnedOn, s_turnedOff)+'*'+LineEnding, pmMarkdown, aReplyMarkup, True);
   finally
     aReplyMarkup.Free;
@@ -765,7 +767,7 @@ begin
       aReplyMarkup.InlineKeyBoard.Add.AddButtons(['Update list',
         dt_bulksend+' '+dt_set+' '+dt_userlist+' '+aUserListID.ToString+' '+dt_update+' '+BoolToStr(True)]);
     aReplyMarkup.InlineKeyBoard.Add.AddButton(emj_Back+' '+s_List, data_ListBulk(dt_userlist));
-    Bot.EditOrSendMessage('User list with name: '+
+    TGBot.EditOrSendMessage('User list with name: '+
       MarkdownEscape(BulkSenderDB.GetUserListByID(aUserListID).Name)+'. #'+aUserListID.ToString+
       LineEnding, pmMarkdown, aReplyMarkup, True);
   finally
@@ -815,7 +817,7 @@ begin
       aReplyMarkup.InlineKeyBoard.AddButton('#'+i.ID.ToString, dt_bulksend+' '+dt_edit+' '+
         dt_bulkmessage+' '+i.id.ToString, 5);
     aReplyMarkup.InlineKeyBoard.Add.AddButton(emj_Back+' '+'Bulk sending main menu', dt_bulksend);
-    Bot.EditOrSendMessage(aMsg, pmMarkdown, aReplyMarkup, True);
+    TGBot.EditOrSendMessage(aMsg, pmMarkdown, aReplyMarkup, True);
   finally
     aReplyMarkup.Free;
   end;
@@ -855,7 +857,7 @@ begin
       aCSV+='['+aTaskItem.UserID.ToString+'](tg://user?id='+aTaskItem.UserID.ToString+')  '+
         mdCode+aTaskItem.ErrorCode.ToString+mdCode+'  "'+aTaskItem.ErrorDescr+'"'+LineEnding;
     aMsg:='Report of recipient list'+LineEnding+aCSV;
-    Bot.EditOrSendMessage(aMsg, pmMarkdown, aReplyMarkup, True);
+    TGBot.EditOrSendMessage(aMsg, pmMarkdown, aReplyMarkup, True);
   finally
     aReplyMarkup.Free;
   end;
@@ -907,17 +909,16 @@ begin
     else
       Item;
     end;
-    Bot.EditOrSendMessage(aMsg, pmMarkdown, aReplyMarkup, True);
+    TGBot.EditOrSendMessage(aMsg, pmMarkdown, aReplyMarkup, True);
   finally
     aReplyMarkup.Free;
   end;
 end;
 
-constructor TBotPlgnBulkSender.Create(aOwner: TWebhookBot);
+constructor TBotPlgnBulkSender.Create(aOwner: TTelegramBot);
 begin
-  FBot:=aOwner;
+  inherited;
   AllIsYearsAgo:=7;
-  Register;
 end;
 
 destructor TBotPlgnBulkSender.Destroy;
