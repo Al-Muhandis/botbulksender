@@ -5,7 +5,7 @@ unit BotBulk;
 interface
 
 uses
-  Classes, SysUtils, tgtypes, tgsendertypes, brooktelegramaction, bulksend_db, tgsenderworker, tgplugin, tgbot
+  Classes, SysUtils, tgtypes, tgsendertypes, bulksend_db, tgsenderworker, tgplugin, tgbot
   ;
 
 type
@@ -59,7 +59,7 @@ type
     function GetListFileName(const ListID: String): String;
     procedure SaveList(AStrings: TStrings; out ListID: String);
     procedure SetWorker(AValue: TBulkSenderThread);
-    function TGBot: TWebhookBot;
+    function TGBot: TTelegramBot;
   protected
     property BulkSenderDB: TBulkSenderDB read GetBulkSenderDB;
     procedure Register; override;
@@ -606,9 +606,9 @@ begin
   Directory:=AValue.Directory;
 end;
 
-function TBotPlgnBulkSender.TGBot: TWebhookBot;
+function TBotPlgnBulkSender.TGBot: TTelegramBot;
 begin
-  Result:=Bot as TWebhookBot;
+  Result:=Bot as TTelegramBot;
 end;
 
 procedure TBotPlgnBulkSender.BotBulkEdit(const aDataLine: String);
