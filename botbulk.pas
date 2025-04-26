@@ -680,7 +680,7 @@ begin
       LineEnding+LineEnding+'Message:'+LineEnding+BulkSenderDB.GetBulkMessageByID(aBulkMessageID).Text;
     TGBot.EditOrSendMessage(aMsg, pmMarkdown, aReplyMarkup, True);
   finally
-   aReplyMarkup.Free;
+    aReplyMarkup.Free;
   end;
 end;
 
